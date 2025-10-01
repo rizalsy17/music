@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Head, router } from "@inertiajs/react"
 import {
   Settings,
@@ -14,6 +14,11 @@ const MusicPlayer = () => {
     currentTime: "1:23",
   })
 
+  const [users, setUsers] = useState([]);
+  const [activeUserId, setActiveUserId] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  
   const [isPlaying, setIsPlaying] = useState(true)
   const [volume, setVolume] = useState(75)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
@@ -34,30 +39,43 @@ const MusicPlayer = () => {
     { name: "Files", active: false },
   ]
 
-  const playlists = [
-    { name: "Dejavu", tracks: 30, color: "bg-orange-400", image: "/dejavu-album-cover.jpg" },
-    { name: "Playlist of the day", tracks: 28, color: "bg-blue-500", image: "/daily-playlist-cover.jpg" },
-    { name: "Something new", tracks: 37, color: "bg-purple-400", image: "/new-music-playlist.jpg" },
-    { name: "Exclusive show", tracks: 17, color: "bg-green-500", image: "/exclusive-show-cover.jpg" },
-  ]
+ useEffect(() => {
+    const userIds = [
+      "31fzsmrxb23e2copmvrb23hg7xaq", // akun 1
+      "31tbuvhagfp4sxps4f4xpo435sze"  // akun 2
+    ];
 
-  const nowPlaying = [
-    { title: "Cruel", artist: "Jackson Wang", duration: "3:25", active: true },
-    { title: "Gum", artist: "Jessie", duration: "2:42", active: false },
-    { title: "Softcore", artist: "The Neighbourhood", duration: "3:26", active: false },
-    { title: "Mockingbird", artist: "Eminem", duration: "4:10", active: false },
-    { title: "Get money i love it", artist: "Bloo", duration: "2:19", active: false },
-    { title: "MOVE", artist: "TAEMIN", duration: "3:31", active: false },
-    { title: "In The Party", artist: "Flo Milli", duration: "2:17", active: false },
-    { title: "Drowning", artist: "WOODZ", duration: "4:10", active: false },
-    { title: "Zime Blue", artist: "Markul", duration: "3:02", active: false },
-  ]
+    const fetchUsers = async () => {
+      const results = [];
+      for (const id of userIds) {
+        try {
+          const profileRes = await fetch(`http://127.0.0.1:8000/api/spotify/profile/${id}`);
+          const profile = await profileRes.json();
+
+          const playlistsRes = await fetch(`http://127.0.0.1:8000/api/spotify/playlists/${id}`);
+          const playlists = await playlistsRes.json();
+
+          results.push({ profile, playlists: playlists.items || [] });
+        } catch (err) {
+          console.error("Error fetch user:", id, err);
+        }
+      }
+      setUsers(results);
+      if (results.length > 0) {
+        setActiveUserId(results[0].profile.id); // default pilih user pertama
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
 
   const recommendations = [
     { title: "Drunk-Dazed", artist: "ENHYPEN", duration: "3:13", image: "/drunk-dazed-album.jpg" },
     { title: "Wrecked", artist: "Imagine Dragons", duration: "4:04", image: "/wrecked-album-cover.jpg" },
   ]
 
+  
   return (
     <>
       <Head title="Music Player" />
@@ -207,32 +225,43 @@ const MusicPlayer = () => {
                 </div>
               </div>
 
-              <div className="mb-6 lg:mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg lg:text-xl font-semibold">Playlists for you</h3>
-                  <a href="#" className="text-gray-400 hover:text-white text-sm">
-                    View all
-                  </a>
-                </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                  {playlists.map((playlist) => (
+
+    <div className="mb-6 lg:mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg lg:text-xl font-semibold">Playlists for you</h3>
+        <a href="#" className="text-gray-400 hover:text-white text-sm">View all</a>
+      </div>
+
+      <div id="playlists">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+              {users
+                .filter((user) => user.profile.id === activeUserId)
+                .flatMap((user) =>
+                  user.playlists.map((playlist) => (
                     <div
-                      key={playlist.name}
+                      key={playlist.id}
                       className="bg-gray-800 rounded-lg p-3 lg:p-4 hover:bg-gray-700 transition-colors cursor-pointer"
                     >
                       <div className="aspect-square mb-2 lg:mb-3 rounded-lg overflow-hidden">
                         <img
-                          src={playlist.image || "/placeholder.svg"}
+                          src={playlist.images?.[0]?.url || "/placeholder.svg"}
                           alt={playlist.name}
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      <h4 className="font-medium mb-1 text-sm lg:text-base truncate">{playlist.name}</h4>
-                      <p className="text-xs lg:text-sm text-gray-400">{playlist.tracks} tracks</p>
+                      <h4 className="font-medium mb-1 text-sm lg:text-base truncate">
+                        {playlist.name}
+                      </h4>
+                      <p className="text-xs lg:text-sm text-gray-400">
+                        {playlist.tracks?.total} tracks
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  ))
+                )}
+        </div>
+      </div>
+    </div>
+
 
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -265,37 +294,34 @@ const MusicPlayer = () => {
               </div>
             </div>
 
-            <div className="hidden lg:block w-80 bg-gray-800 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold">Now playing</h3>
-                <a href="#" className="text-gray-400 hover:text-white text-sm">
-                  View all
-                </a>
-              </div>
-              <div className="space-y-3">
-                {nowPlaying.map((track, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                      track.active ? "bg-gray-700" : "hover:bg-gray-700"
-                    }`}
-                  >
-                    <div className="w-10 h-10 bg-gray-600 rounded-lg overflow-hidden">
-                      <img
-                        src={`/abstract-geometric-shapes.png?height=40&width=40&query=${track.title} album`}
-                        alt={track.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm truncate">{track.title}</h4>
-                      <p className="text-xs text-gray-400 truncate">{track.artist}</p>
-                    </div>
-                    <span className="text-xs text-gray-400">{track.duration}</span>
-                  </div>
-                ))}
-              </div>
+           <div className="hidden lg:block w-80 bg-gray-800 p-6">
+  <div className="mb-4">
+    <h2 className="text-xl font-bold text-white">Daftar Akun</h2>
+  </div>
+
+  {users.map((user, idx) => (
+          <div
+            key={idx}
+            onClick={() => setActiveUserId(user.profile.id)}
+            className={`flex items-center space-x-3 mb-6 cursor-pointer p-2 rounded-lg transition-colors 
+              ${activeUserId === user.profile.id ? "bg-gray-700" : "hover:bg-gray-700"}`}
+          >
+            <img
+              src={user.profile.images?.[0]?.url || "/placeholder.svg"}
+              alt={user.profile.display_name}
+              className="w-12 h-12 rounded-full object-cover"
+            />
+            <div>
+              <h3 className="text-lg font-semibold">{user.profile.display_name}</h3>
+              <p className="text-sm text-gray-400">
+                {user.profile.followers?.total} followers
+              </p>
             </div>
+          </div>
+        ))}
+</div>
+
+
           </div>
 
           <div className="bg-gray-800 border-t border-gray-700">
